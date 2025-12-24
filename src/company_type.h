@@ -13,7 +13,16 @@
 #include "core/base_bitset_type.hpp"
 #include "core/pool_type.hpp"
 
-using CompanyID = PoolID<uint8_t, struct CompanyIDTag, 0xF, 0xFF>;
+/** Amount of bits used to encode company identifiers inside the game state. */
+static constexpr uint8_t COMPANY_ID_BITS = 6;
+/** Maximum representable company slot number based on the encoding width. */
+static constexpr uint8_t COMPANY_ID_MASK = (1U << COMPANY_ID_BITS) - 1;
+/** Number of company slots supported by the pool. */
+static constexpr uint8_t COMPANY_POOL_SIZE = 50;
+/** Legacy maximum number of companies for backwards compatibility. */
+static constexpr uint8_t LEGACY_MAX_COMPANIES = 15;
+
+using CompanyID = PoolID<uint8_t, struct CompanyIDTag, COMPANY_POOL_SIZE, 0xFF>;
 
 /* 'Fake' companies used for networks */
 static constexpr CompanyID COMPANY_INACTIVE_CLIENT{253}; ///< The client is joining
@@ -22,14 +31,18 @@ static constexpr CompanyID COMPANY_SPECTATOR{255}; ///< The client is spectating
 
 using Owner = CompanyID;
 static constexpr Owner OWNER_BEGIN = Owner::Begin(); ///< First owner
-static constexpr Owner OWNER_TOWN{0x0F}; ///< A town owns the tile, or a town is expanding
-static constexpr Owner OWNER_NONE{0x10}; ///< The tile has no ownership
-static constexpr Owner OWNER_WATER{0x11}; ///< The tile/execution is done by "water"
-static constexpr Owner OWNER_DEITY{0x12}; ///< The object is owned by a superuser / goal script
-static constexpr Owner OWNER_END{0x13}; ///< Last + 1 owner
+static constexpr Owner OWNER_TOWN{CompanyID::End()}; ///< A town owns the tile, or a town is expanding
+static constexpr Owner OWNER_NONE{static_cast<Owner::ValueType>(CompanyID::End() + 1)}; ///< The tile has no ownership
+static constexpr Owner OWNER_WATER{static_cast<Owner::ValueType>(CompanyID::End() + 2)}; ///< The tile/execution is done by "water"
+static constexpr Owner OWNER_DEITY{static_cast<Owner::ValueType>(CompanyID::End() + 3)}; ///< The object is owned by a superuser / goal script
+static constexpr Owner OWNER_END{static_cast<Owner::ValueType>(CompanyID::End() + 4)}; ///< Last + 1 owner
 static constexpr Owner INVALID_OWNER = Owner::Invalid(); ///< An invalid owner
 
-static const uint8_t MAX_COMPANIES = CompanyID::End().base();
+static_assert(OWNER_END.base() < COMPANY_INACTIVE_CLIENT.base(), "Owner special values must stay below network pseudo companies");
+
+static constexpr uint8_t MAX_COMPANIES = CompanyID::End().base();
+static_assert(MAX_COMPANIES <= COMPANY_ID_MASK, "Company ID mask must cover all company slots.");
+static_assert(MAX_COMPANIES <= 64, "CompanyMask storage requires 64 bits or fewer.");
 static const uint MAX_LENGTH_PRESIDENT_NAME_CHARS = 32; ///< The maximum length of a president name in characters including '\0'
 static const uint MAX_LENGTH_COMPANY_NAME_CHARS   = 32; ///< The maximum length of a company name in characters including '\0'
 
@@ -40,9 +53,11 @@ static const uint MAX_COMPETITORS_INTERVAL = 500; ///< The maximum interval (in 
 
 typedef Owner CompanyID;
 
-class CompanyMask : public BaseBitSet<CompanyMask, CompanyID, uint16_t> {
+static constexpr uint64_t COMPANY_MASK_ALL = (uint64_t{1} << MAX_COMPANIES) - 1;
+
+class CompanyMask : public BaseBitSet<CompanyMask, CompanyID, uint64_t, COMPANY_MASK_ALL> {
 public:
-	constexpr CompanyMask() : BaseBitSet<CompanyMask, CompanyID, uint16_t>() {}
+        constexpr CompanyMask() : BaseBitSet<CompanyMask, CompanyID, uint64_t, COMPANY_MASK_ALL>() {}
 	static constexpr size_t DecayValueType(CompanyID value) { return value.base(); }
 
 	constexpr auto operator <=>(const CompanyMask &) const noexcept = default;
