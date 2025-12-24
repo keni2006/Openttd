@@ -2077,28 +2077,37 @@ bool AfterLoadGame()
 		}
 	}
 
-	if (IsSavegameVersionBefore(SLV_104)) {
-		for (Aircraft *a : Aircraft::Iterate()) {
-			/* Set engine_type of shadow and rotor */
-			if (!a->IsNormalAircraft()) {
-				a->engine_type = a->First()->engine_type;
-			}
-		}
+        if (IsSavegameVersionBefore(SLV_104)) {
+                for (Aircraft *a : Aircraft::Iterate()) {
+                        /* Set engine_type of shadow and rotor */
+                        if (!a->IsNormalAircraft()) {
+                                a->engine_type = a->First()->engine_type;
+                        }
+                }
 
-		/* More companies ... */
-		for (Company *c : Company::Iterate()) {
-			if (c->bankrupt_asked.base() == 0xFF) c->bankrupt_asked.Set();
-		}
+                /* More companies ... */
+                for (Company *c : Company::Iterate()) {
+                        if (c->bankrupt_asked.base() == 0xFF) c->bankrupt_asked.Set();
+                }
 
-		for (Engine *e : Engine::Iterate()) {
-			if (e->company_avail.base() == 0xFF) e->company_avail.Set();
-		}
+                for (Engine *e : Engine::Iterate()) {
+                        if (e->company_avail.base() == 0xFF) e->company_avail.Set();
+                }
 
-		for (Town *t : Town::Iterate()) {
-			if (t->have_ratings.base() == 0xFF) t->have_ratings.Set();
-			for (uint i = 8; i != MAX_COMPANIES; i++) t->ratings[i] = RATING_INITIAL;
-		}
-	}
+                for (Town *t : Town::Iterate()) {
+                        if (t->have_ratings.base() == 0xFF) t->have_ratings.Set();
+                        for (uint i = 8; i != MAX_COMPANIES; i++) t->ratings[i] = RATING_INITIAL;
+                }
+        }
+
+        if (IsSavegameVersionBefore(SLV_EXPAND_COMPANY_SLOTS)) {
+                for (Town *t : Town::Iterate()) {
+                        for (CompanyID c = LEGACY_MAX_COMPANIES; c < MAX_COMPANIES; ++c) {
+                                t->ratings[c] = RATING_INITIAL;
+                                t->unwanted[c] = 0;
+                        }
+                }
+        }
 
 	if (IsSavegameVersionBefore(SLV_112)) {
 		for (auto t : Map::Iterate()) {
